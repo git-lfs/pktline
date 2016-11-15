@@ -3,7 +3,7 @@ package pktline
 import (
 	"io"
 
-	"github.com/github/git-lfs/tools"
+	"github.com/git-lfs/git-lfs/tools"
 )
 
 type pktlineReader struct {
