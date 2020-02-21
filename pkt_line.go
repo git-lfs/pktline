@@ -16,19 +16,19 @@ const (
 	MaxPacketLength = 65516
 )
 
-type pktline struct {
+type Pktline struct {
 	r *bufio.Reader
 	w *bufio.Writer
 }
 
-func newPktline(r io.Reader, w io.Writer) *pktline {
-	return &pktline{
+func NewPktline(r io.Reader, w io.Writer) *Pktline {
+	return &Pktline{
 		r: bufio.NewReader(r),
 		w: bufio.NewWriter(w),
 	}
 }
 
-// readPacket reads a single packet entirely and returns the data encoded within
+// ReadPacket reads a single packet entirely and returns the data encoded within
 // it. Errors can occur in several cases, as described below.
 //
 // 1) If no data was present in the reader, and no more data could be read (the
@@ -39,11 +39,11 @@ func newPktline(r io.Reader, w io.Writer) *pktline {
 // 3) If there was a valid header, but no body associated with the packet, an
 //    "Invalid packet length." error will be returned.
 // 4) If the data in the header could not be parsed as a hexadecimal length in
-//    the Git pktline format, the parse error will be returned.
+//    the Git Pktline format, the parse error will be returned.
 //
 // If none of the above cases fit the state of the data on the wire, the packet
 // is returned along with a nil error.
-func (p *pktline) readPacket() ([]byte, error) {
+func (p *Pktline) ReadPacket() ([]byte, error) {
 	var pktLenHex [4]byte
 	if n, err := io.ReadFull(p.r, pktLenHex[:]); err != nil {
 		return nil, err
@@ -68,21 +68,21 @@ func (p *pktline) readPacket() ([]byte, error) {
 	return payload, err
 }
 
-// readPacketText follows identical semantics to the `readPacket()` function,
+// ReadPacketText follows identical semantics to the `readPacket()` function,
 // but additionally removes the trailing `\n` LF from the end of the packet, if
 // present.
-func (p *pktline) readPacketText() (string, error) {
-	data, err := p.readPacket()
+func (p *Pktline) ReadPacketText() (string, error) {
+	data, err := p.ReadPacket()
 	return strings.TrimSuffix(string(data), "\n"), err
 }
 
-// readPacketList reads as many packets as possible using the `readPacketText`
+// ReadPacketList reads as many packets as possible using the `readPacketText`
 // function before encountering a flush packet. It returns a slice of all the
 // packets it read, or an error if one was encountered.
-func (p *pktline) readPacketList() ([]string, error) {
+func (p *Pktline) ReadPacketList() ([]string, error) {
 	var list []string
 	for {
-		data, err := p.readPacketText()
+		data, err := p.ReadPacketText()
 		if err != nil {
 			return nil, err
 		}
@@ -97,7 +97,7 @@ func (p *pktline) readPacketList() ([]string, error) {
 	return list, nil
 }
 
-// writePacket writes the given data in "data" to the underlying data stream
+// WritePacket writes the given data in "data" to the underlying data stream
 // using Git's `pkt-line` format.
 //
 // If the data was longer than MaxPacketLength, an error will be returned. If
@@ -106,7 +106,7 @@ func (p *pktline) readPacketList() ([]string, error) {
 //
 // NB: writePacket does _not_ flush the underlying buffered writer. See instead:
 // `writeFlush()`.
-func (p *pktline) writePacket(data []byte) error {
+func (p *Pktline) WritePacket(data []byte) error {
 	if len(data) > MaxPacketLength {
 		return errors.New("Packet length exceeds maximal length")
 	}
@@ -122,11 +122,11 @@ func (p *pktline) writePacket(data []byte) error {
 	return nil
 }
 
-// writeFlush writes the terminating "flush" packet and then flushes the
+// WriteFlush writes the terminating "flush" packet and then flushes the
 // underlying buffered writer.
 //
 // If any error was encountered along the way, it will be returned immediately
-func (p *pktline) writeFlush() error {
+func (p *Pktline) WriteFlush() error {
 	if _, err := p.w.WriteString(fmt.Sprintf("%04x", 0)); err != nil {
 		return err
 	}
@@ -138,22 +138,22 @@ func (p *pktline) writeFlush() error {
 	return nil
 }
 
-// writePacketText follows the same semantics as `writePacket`, but appends a
+// WritePacketText follows the same semantics as `writePacket`, but appends a
 // trailing "\n" LF character to the end of the data.
-func (p *pktline) writePacketText(data string) error {
-	return p.writePacket([]byte(data + "\n"))
+func (p *Pktline) WritePacketText(data string) error {
+	return p.WritePacket([]byte(data + "\n"))
 }
 
-// writePacketList writes a slice of strings using the semantics of
+// WritePacketList writes a slice of strings using the semantics of
 // and then writes a terminating flush sequence afterwords.
 //
 // If any error was encountered, it will be returned immediately.
-func (p *pktline) writePacketList(list []string) error {
+func (p *Pktline) WritePacketList(list []string) error {
 	for _, i := range list {
-		if err := p.writePacketText(i); err != nil {
+		if err := p.WritePacketText(i); err != nil {
 			return err
 		}
 	}
 
-	return p.writeFlush()
+	return p.WriteFlush()
 }
