@@ -10,7 +10,7 @@ import (
 func TestPktlineWriterWritesPacketsShorterThanMaxPacketSize(t *testing.T) {
 	var buf bytes.Buffer
 
-	w := NewPktlineWriter(&buf, 0)
+	w := NewPktlineWriterFromPktline(NewPktline(nil, &buf), 0)
 	assertWriterWrite(t, w, []byte("Hello, world!"), 13)
 	assertWriterWrite(t, w, nil, 0)
 

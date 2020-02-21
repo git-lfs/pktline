@@ -26,6 +26,16 @@ func NewPktlineReader(r io.Reader, c int) *PktlineReader {
 	}
 }
 
+// NewPktlineReaderFromPktline returns a new *PktlineReader based on the
+// underlying *Pktline object.  The internal buffer is initialized with the
+// given capacity, "c".
+func NewPktlineReaderFromPktline(pl *Pktline, c int) *PktlineReader {
+	return &PktlineReader{
+		buf: make([]byte, 0, c),
+		pl:  pl,
+	}
+}
+
 func (r *PktlineReader) Read(p []byte) (int, error) {
 	var n int
 

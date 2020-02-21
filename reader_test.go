@@ -26,7 +26,7 @@ func TestPktlineReaderReadsSinglePacketsInOneCall(t *testing.T) {
 
 	writePacket(t, &buf, []byte("asdf"))
 
-	pr := &PktlineReader{pl: NewPktline(&buf, nil)}
+	pr := NewPktlineReader(&buf, 10)
 
 	data, err := ioutil.ReadAll(pr)
 
@@ -39,7 +39,7 @@ func TestPktlineReaderReadsManyPacketsInOneCall(t *testing.T) {
 
 	writePacket(t, &buf, []byte("first\n"), []byte("second"))
 
-	pr := &PktlineReader{pl: NewPktline(&buf, nil)}
+	pr := NewPktlineReaderFromPktline(NewPktline(&buf, nil), 10)
 
 	data, err := ioutil.ReadAll(pr)
 
@@ -52,7 +52,7 @@ func TestPktlineReaderReadsSinglePacketsInMultipleCallsWithUnevenBuffering(t *te
 
 	writePacket(t, &buf, []byte("asdf"))
 
-	pr := &PktlineReader{pl: NewPktline(&buf, nil)}
+	pr := NewPktlineReaderFromPktline(NewPktline(&buf, nil), 10)
 
 	var p1 [3]byte
 	var p2 [1]byte
@@ -73,7 +73,7 @@ func TestPktlineReaderReadsManyPacketsInMultipleCallsWithUnevenBuffering(t *test
 
 	writePacket(t, &buf, []byte("first"), []byte("second"))
 
-	pr := &PktlineReader{pl: NewPktline(&buf, nil)}
+	pr := NewPktlineReaderFromPktline(NewPktline(&buf, nil), 10)
 
 	var p1 [4]byte
 	var p2 [7]byte
@@ -100,7 +100,7 @@ func TestPktlineReaderReadsSinglePacketsInMultipleCallsWithEvenBuffering(t *test
 
 	writePacket(t, &buf, []byte("firstother"))
 
-	pr := &PktlineReader{pl: NewPktline(&buf, nil)}
+	pr := NewPktlineReaderFromPktline(NewPktline(&buf, nil), 10)
 
 	var p1 [5]byte
 	var p2 [5]byte
@@ -121,7 +121,7 @@ func TestPktlineReaderReadsManyPacketsInMultipleCallsWithEvenBuffering(t *testin
 
 	writePacket(t, &buf, []byte("first"), []byte("other"))
 
-	pr := &PktlineReader{pl: NewPktline(&buf, nil)}
+	pr := NewPktlineReaderFromPktline(NewPktline(&buf, nil), 10)
 
 	var p1 [5]byte
 	var p2 [5]byte

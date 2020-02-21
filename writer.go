@@ -33,6 +33,16 @@ func NewPktlineWriter(w io.Writer, c int) *PktlineWriter {
 	}
 }
 
+// NewPktlineWriterFromPktline returns a new *PktlineWriter based on the
+// underlying *Pktline object.  The internal buffer is initialized with the
+// given capacity, "c".
+func NewPktlineWriterFromPktline(pl *Pktline, c int) *PktlineWriter {
+	return &PktlineWriter{
+		buf: make([]byte, 0, c),
+		pl:  pl,
+	}
+}
+
 // Write implements the io.Writer interface's `Write` method by providing a
 // packet-based backend to the given buffer "p".
 //
