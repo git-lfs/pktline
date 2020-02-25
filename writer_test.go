@@ -10,11 +10,11 @@ import (
 func TestPktlineWriterWritesPacketsShorterThanMaxPacketSize(t *testing.T) {
 	var buf bytes.Buffer
 
-	w := NewPktlineWriter(&buf, 0)
+	w := NewPktlineWriterFromPktline(NewPktline(nil, &buf), 0)
 	assertWriterWrite(t, w, []byte("Hello, world!"), 13)
 	assertWriterWrite(t, w, nil, 0)
 
-	pl := newPktline(&buf, nil)
+	pl := NewPktline(&buf, nil)
 	assertPacketRead(t, pl, []byte("Hello, world!"))
 	assertPacketRead(t, pl, nil)
 }
@@ -35,7 +35,7 @@ func TestPktlineWriterWritesPacketsEqualToMaxPacketLength(t *testing.T) {
 	assertWriterWrite(t, w, p, len(big))
 	assertWriterWrite(t, w, nil, 0)
 
-	pl := newPktline(&buf, nil)
+	pl := NewPktline(&buf, nil)
 	assertPacketRead(t, pl, big)
 	assertPacketRead(t, pl, nil)
 }
@@ -48,7 +48,7 @@ func TestPktlineWriterWritesMultiplePacketsLessThanMaxPacketLength(t *testing.T)
 	assertWriterWrite(t, w, []byte("second"), len("second"))
 	assertWriterWrite(t, w, nil, 0)
 
-	pl := newPktline(&buf, nil)
+	pl := NewPktline(&buf, nil)
 	assertPacketRead(t, pl, []byte("first\nsecond"))
 	assertPacketRead(t, pl, nil)
 }
@@ -75,7 +75,7 @@ func TestPktlineWriterWritesMultiplePacketsGreaterThanMaxPacketLength(t *testing
 	// packet
 	offs := MaxPacketLength - len(b1)
 
-	pl := newPktline(&buf, nil)
+	pl := NewPktline(&buf, nil)
 	assertPacketRead(t, pl, append(b1, b2[:offs]...))
 	assertPacketRead(t, pl, b2[offs:])
 	assertPacketRead(t, pl, nil)
@@ -106,8 +106,8 @@ func assertWriterWrite(t *testing.T, w *PktlineWriter, p []byte, plen int) {
 	assert.Equal(t, plen, n)
 }
 
-func assertPacketRead(t *testing.T, pl *pktline, expected []byte) {
-	got, err := pl.readPacket()
+func assertPacketRead(t *testing.T, pl *Pktline, expected []byte) {
+	got, err := pl.ReadPacket()
 
 	assert.Nil(t, err)
 	assert.Equal(t, expected, got)

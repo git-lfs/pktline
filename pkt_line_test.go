@@ -18,9 +18,9 @@ type PacketReadTestCase struct {
 
 func (c *PacketReadTestCase) Assert(t *testing.T) {
 	buf := bytes.NewReader(c.In)
-	rw := newPktline(buf, nil)
+	rw := NewPktline(buf, nil)
 
-	pkt, err := rw.readPacket()
+	pkt, err := rw.ReadPacket()
 
 	if len(c.Payload) > 0 {
 		assert.Equal(t, c.Payload, pkt)
@@ -95,37 +95,37 @@ func TestPktLineDiscardsPacketsWithUnparseableLength(t *testing.T) {
 }
 
 func TestPktLineReadsTextWithNewline(t *testing.T) {
-	rw := newPktline(bytes.NewReader([]byte{
+	rw := NewPktline(bytes.NewReader([]byte{
 		0x30, 0x30, 0x30, 0x39, // 0009 (hex. length)
 		0x61, 0x62, 0x63, 0x64, 0xa,
 		// Empty body
 	}), nil)
 
-	str, err := rw.readPacketText()
+	str, err := rw.ReadPacketText()
 
 	assert.Nil(t, err)
 	assert.Equal(t, "abcd", str)
 }
 
 func TestPktLineReadsTextWithoutNewline(t *testing.T) {
-	rw := newPktline(bytes.NewReader([]byte{
+	rw := NewPktline(bytes.NewReader([]byte{
 		0x30, 0x30, 0x30, 0x38, // 0009 (hex. length)
 		0x61, 0x62, 0x63, 0x64,
 	}), nil)
 
-	str, err := rw.readPacketText()
+	str, err := rw.ReadPacketText()
 
 	assert.Nil(t, err)
 	assert.Equal(t, "abcd", str)
 }
 
 func TestPktLineReadsTextWithErr(t *testing.T) {
-	rw := newPktline(bytes.NewReader([]byte{
+	rw := NewPktline(bytes.NewReader([]byte{
 		0x30, 0x30, 0x30, 0x34, // 0004 (hex. length)
 		// No body
 	}), nil)
 
-	str, err := rw.readPacketText()
+	str, err := rw.ReadPacketText()
 
 	require.NotNil(t, err)
 	assert.Equal(t, "Invalid packet length.", err.Error())
@@ -133,7 +133,7 @@ func TestPktLineReadsTextWithErr(t *testing.T) {
 }
 
 func TestPktLineAppendsPacketLists(t *testing.T) {
-	rw := newPktline(bytes.NewReader([]byte{
+	rw := NewPktline(bytes.NewReader([]byte{
 		0x30, 0x30, 0x30, 0x38, // 0009 (hex. length)
 		0x61, 0x62, 0x63, 0x64, // "abcd"
 
@@ -143,14 +143,14 @@ func TestPktLineAppendsPacketLists(t *testing.T) {
 		0x30, 0x30, 0x30, 0x30, // 0000 (hex. length)
 	}), nil)
 
-	str, err := rw.readPacketList()
+	str, err := rw.ReadPacketList()
 
 	assert.Nil(t, err)
 	assert.Equal(t, []string{"abcd", "efgh"}, str)
 }
 
 func TestPktLineAppendsPacketListsAndReturnsErrs(t *testing.T) {
-	rw := newPktline(bytes.NewReader([]byte{
+	rw := NewPktline(bytes.NewReader([]byte{
 		0x30, 0x30, 0x30, 0x38, // 0009 (hex. length)
 		0x61, 0x62, 0x63, 0x64, // "abcd"
 
@@ -158,7 +158,7 @@ func TestPktLineAppendsPacketListsAndReturnsErrs(t *testing.T) {
 		// No body
 	}), nil)
 
-	str, err := rw.readPacketList()
+	str, err := rw.ReadPacketList()
 
 	require.NotNil(t, err)
 	assert.Equal(t, "Invalid packet length.", err.Error())
@@ -168,11 +168,11 @@ func TestPktLineAppendsPacketListsAndReturnsErrs(t *testing.T) {
 func TestPktLineWritesPackets(t *testing.T) {
 	var buf bytes.Buffer
 
-	rw := newPktline(nil, &buf)
-	require.Nil(t, rw.writePacket([]byte{
+	rw := NewPktline(nil, &buf)
+	require.Nil(t, rw.WritePacket([]byte{
 		0x1, 0x2, 0x3, 0x4,
 	}))
-	require.Nil(t, rw.writeFlush())
+	require.Nil(t, rw.WriteFlush())
 
 	assert.Equal(t, []byte{
 		0x30, 0x30, 0x30, 0x38, // 0008 (hex. length)
@@ -184,8 +184,8 @@ func TestPktLineWritesPackets(t *testing.T) {
 func TestPktLineWritesPacketsEqualToMaxLength(t *testing.T) {
 	var buf bytes.Buffer
 
-	rw := newPktline(nil, &buf)
-	err := rw.writePacket(make([]byte, MaxPacketLength))
+	rw := NewPktline(nil, &buf)
+	err := rw.WritePacket(make([]byte, MaxPacketLength))
 
 	assert.Nil(t, err)
 	assert.Equal(t, 4+MaxPacketLength, len(buf.Bytes()))
@@ -194,8 +194,8 @@ func TestPktLineWritesPacketsEqualToMaxLength(t *testing.T) {
 func TestPktLineDoesNotWritePacketsExceedingMaxLength(t *testing.T) {
 	var buf bytes.Buffer
 
-	rw := newPktline(nil, &buf)
-	err := rw.writePacket(make([]byte, MaxPacketLength+1))
+	rw := NewPktline(nil, &buf)
+	err := rw.WritePacket(make([]byte, MaxPacketLength+1))
 
 	require.NotNil(t, err)
 	assert.Equal(t, "Packet length exceeds maximal length", err.Error())
@@ -205,10 +205,10 @@ func TestPktLineDoesNotWritePacketsExceedingMaxLength(t *testing.T) {
 func TestPktLineWritesPacketText(t *testing.T) {
 	var buf bytes.Buffer
 
-	rw := newPktline(nil, &buf)
+	rw := NewPktline(nil, &buf)
 
-	require.Nil(t, rw.writePacketText("abcd"))
-	require.Nil(t, rw.writeFlush())
+	require.Nil(t, rw.WritePacketText("abcd"))
+	require.Nil(t, rw.WriteFlush())
 
 	assert.Equal(t, []byte{
 		0x30, 0x30, 0x30, 0x39, // 0009 (hex. length)
@@ -220,8 +220,8 @@ func TestPktLineWritesPacketText(t *testing.T) {
 func TestPktLineWritesPacketLists(t *testing.T) {
 	var buf bytes.Buffer
 
-	rw := newPktline(nil, &buf)
-	err := rw.writePacketList([]string{"foo", "bar"})
+	rw := NewPktline(nil, &buf)
+	err := rw.WritePacketList([]string{"foo", "bar"})
 
 	assert.Nil(t, err)
 	assert.Equal(t, []byte{

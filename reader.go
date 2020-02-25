@@ -2,25 +2,47 @@ package pktline
 
 import (
 	"io"
-
-	"github.com/git-lfs/git-lfs/tools"
 )
 
-type pktlineReader struct {
-	pl *pktline
+type PktlineReader struct {
+	pl *Pktline
 
 	buf []byte
 }
 
-var _ io.Reader = new(pktlineReader)
+// NewPktlineReader returns a new *PktlineReader, which will read from the
+// underlying data stream "r". The internal buffer is initialized with the given
+// capacity, "c".
+//
+// If "r" is already a `*PktlineReader`, it will be returned as-is.
+func NewPktlineReader(r io.Reader, c int) *PktlineReader {
+	if pr, ok := r.(*PktlineReader); ok {
+		return pr
+	}
 
-func (r *pktlineReader) Read(p []byte) (int, error) {
+	return &PktlineReader{
+		buf: make([]byte, 0, c),
+		pl:  NewPktline(r, nil),
+	}
+}
+
+// NewPktlineReaderFromPktline returns a new *PktlineReader based on the
+// underlying *Pktline object.  The internal buffer is initialized with the
+// given capacity, "c".
+func NewPktlineReaderFromPktline(pl *Pktline, c int) *PktlineReader {
+	return &PktlineReader{
+		buf: make([]byte, 0, c),
+		pl:  pl,
+	}
+}
+
+func (r *PktlineReader) Read(p []byte) (int, error) {
 	var n int
 
 	if len(r.buf) > 0 {
 		// If there is data in the buffer, shift as much out of it and
 		// into the given "p" as we can.
-		n = tools.MinInt(len(p), len(r.buf))
+		n = minInt(len(p), len(r.buf))
 
 		copy(p, r.buf[:n])
 		r.buf = r.buf[n:]
@@ -30,7 +52,7 @@ func (r *pktlineReader) Read(p []byte) (int, error) {
 	// have either, a) overfilled the given buffer "p", or we have started
 	// to internally buffer in "r.buf".
 	for len(r.buf) == 0 {
-		chunk, err := r.pl.readPacket()
+		chunk, err := r.pl.ReadPacket()
 		if err != nil {
 			return n, err
 		}
@@ -44,7 +66,7 @@ func (r *pktlineReader) Read(p []byte) (int, error) {
 		}
 
 		// Figure out how much of the packet we can read into "p".
-		nn := tools.MinInt(len(chunk), len(p[n:]))
+		nn := minInt(len(chunk), len(p[n:]))
 
 		// Move that amount into "p", from where we left off.
 		copy(p[n:], chunk[:nn])
