@@ -172,11 +172,13 @@ func TestPktLineWritesPackets(t *testing.T) {
 	require.Nil(t, rw.WritePacket([]byte{
 		0x1, 0x2, 0x3, 0x4,
 	}))
+	require.Nil(t, rw.WriteDelim())
 	require.Nil(t, rw.WriteFlush())
 
 	assert.Equal(t, []byte{
 		0x30, 0x30, 0x30, 0x38, // 0008 (hex. length)
 		0x1, 0x2, 0x3, 0x4, // payload
+		0x30, 0x30, 0x30, 0x31, // 0001 (delim packet)
 		0x30, 0x30, 0x30, 0x30, // 0000 (flush packet)
 	}, buf.Bytes())
 }

@@ -122,6 +122,22 @@ func (p *Pktline) WritePacket(data []byte) error {
 	return nil
 }
 
+// WriteDelim writes the separating "delim" packet and then flushes the
+// underlying buffered writer.
+//
+// If any error was encountered along the way, it will be returned immediately
+func (p *Pktline) WriteDelim() error {
+	if _, err := p.w.WriteString(fmt.Sprintf("%04x", 1)); err != nil {
+		return err
+	}
+
+	if err := p.w.Flush(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // WriteFlush writes the terminating "flush" packet and then flushes the
 // underlying buffered writer.
 //
