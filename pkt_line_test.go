@@ -12,6 +12,7 @@ import (
 type PacketReadTestCase struct {
 	In []byte
 
+	Length  int
 	Payload []byte
 	Err     string
 }
@@ -34,6 +35,25 @@ func (c *PacketReadTestCase) Assert(t *testing.T) {
 	} else {
 		assert.Nil(t, err)
 	}
+
+	buf = bytes.NewReader(c.In)
+	rw = NewPktline(buf, nil)
+
+	pkt, plen, err := rw.ReadPacketWithLength()
+
+	if len(c.Payload) > 0 {
+		assert.Equal(t, c.Payload, pkt)
+	} else {
+		assert.Empty(t, pkt)
+	}
+
+	if len(c.Err) > 0 {
+		require.NotNil(t, err)
+		assert.Equal(t, c.Err, err.Error())
+	} else {
+		assert.Equal(t, c.Length, plen)
+		assert.Nil(t, err)
+	}
 }
 
 func TestPktLineReadsWholePackets(t *testing.T) {
@@ -42,6 +62,7 @@ func TestPktLineReadsWholePackets(t *testing.T) {
 			0x30, 0x30, 0x30, 0x38, // 0008 (hex. length)
 			0x1, 0x2, 0x3, 0x4, // payload
 		},
+		Length:  8,
 		Payload: []byte{0x1, 0x2, 0x3, 0x4},
 	}
 
@@ -76,6 +97,7 @@ func TestPktLineFlushPacket(t *testing.T) {
 		In: []byte{0x30, 0x30, 0x30, 0x30}, // Flush packet
 
 		Payload: []byte{},
+		Length:  0,
 		Err:     "",
 	}
 
@@ -107,6 +129,20 @@ func TestPktLineReadsTextWithNewline(t *testing.T) {
 	assert.Equal(t, "abcd", str)
 }
 
+func TestPktLineReadsTextWithLengthWithNewline(t *testing.T) {
+	rw := NewPktline(bytes.NewReader([]byte{
+		0x30, 0x30, 0x30, 0x39, // 0009 (hex. length)
+		0x61, 0x62, 0x63, 0x64, 0xa,
+		// Empty body
+	}), nil)
+
+	str, plen, err := rw.ReadPacketTextWithLength()
+
+	assert.Nil(t, err)
+	assert.Equal(t, "abcd", str)
+	assert.Equal(t, plen, 9)
+}
+
 func TestPktLineReadsTextWithoutNewline(t *testing.T) {
 	rw := NewPktline(bytes.NewReader([]byte{
 		0x30, 0x30, 0x30, 0x38, // 0009 (hex. length)
@@ -117,6 +153,19 @@ func TestPktLineReadsTextWithoutNewline(t *testing.T) {
 
 	assert.Nil(t, err)
 	assert.Equal(t, "abcd", str)
+}
+
+func TestPktLineReadsTextWithLengthWithoutNewline(t *testing.T) {
+	rw := NewPktline(bytes.NewReader([]byte{
+		0x30, 0x30, 0x30, 0x38, // 0009 (hex. length)
+		0x61, 0x62, 0x63, 0x64,
+	}), nil)
+
+	str, plen, err := rw.ReadPacketTextWithLength()
+
+	assert.Nil(t, err)
+	assert.Equal(t, "abcd", str)
+	assert.Equal(t, plen, 8)
 }
 
 func TestPktLineReadsTextWithErr(t *testing.T) {
