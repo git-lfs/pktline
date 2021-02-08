@@ -70,7 +70,7 @@ func (p *Pktline) ReadPacketWithLength() ([]byte, int, error) {
 	if pktLen == 0 || pktLen == 1 {
 		return nil, int(pktLen), nil
 	}
-	if pktLen <= 4 {
+	if pktLen < 4 {
 		return nil, int(pktLen), errors.New("Invalid packet length.")
 	}
 

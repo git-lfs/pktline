@@ -25,6 +25,8 @@ func (c *PacketReadTestCase) Assert(t *testing.T) {
 
 	if len(c.Payload) > 0 {
 		assert.Equal(t, c.Payload, pkt)
+	} else if c.Payload == nil {
+		assert.Nil(t, pkt)
 	} else {
 		assert.Empty(t, pkt)
 	}
@@ -43,6 +45,8 @@ func (c *PacketReadTestCase) Assert(t *testing.T) {
 
 	if len(c.Payload) > 0 {
 		assert.Equal(t, c.Payload, pkt)
+	} else if c.Payload == nil {
+		assert.Nil(t, pkt)
 	} else {
 		assert.Empty(t, pkt)
 	}
@@ -78,11 +82,10 @@ func TestPktLineNoPacket(t *testing.T) {
 	tc.Assert(t)
 }
 
-func TestPktLineEmptyPacket(t *testing.T) {
+func TestPktLineInvalidPacket(t *testing.T) {
 	tc := &PacketReadTestCase{
 		In: []byte{
-			0x30, 0x30, 0x30, 0x34,
-			// No body (invalid)
+			0x30, 0x30, 0x30, 0x33,
 		},
 
 		Err: "Invalid packet length.",
@@ -92,12 +95,36 @@ func TestPktLineEmptyPacket(t *testing.T) {
 
 }
 
+func TestPktLineEmptyPacket(t *testing.T) {
+	tc := &PacketReadTestCase{
+		In: []byte{
+			0x30, 0x30, 0x30, 0x34,
+		},
+		Length: 4,
+		Payload: []byte{},
+	}
+
+	tc.Assert(t)
+}
+
 func TestPktLineFlushPacket(t *testing.T) {
 	tc := &PacketReadTestCase{
 		In: []byte{0x30, 0x30, 0x30, 0x30}, // Flush packet
 
-		Payload: []byte{},
+		Payload: nil,
 		Length:  0,
+		Err:     "",
+	}
+
+	tc.Assert(t)
+}
+
+func TestPktLineDelimPacket(t *testing.T) {
+	tc := &PacketReadTestCase{
+		In: []byte{0x30, 0x30, 0x30, 0x31}, // Delim packet
+
+		Payload: nil,
+		Length:  1,
 		Err:     "",
 	}
 
@@ -168,7 +195,7 @@ func TestPktLineReadsTextWithLengthWithoutNewline(t *testing.T) {
 	assert.Equal(t, plen, 8)
 }
 
-func TestPktLineReadsTextWithErr(t *testing.T) {
+func TestPktLineReadsTextWithEmpty(t *testing.T) {
 	rw := NewPktline(bytes.NewReader([]byte{
 		0x30, 0x30, 0x30, 0x34, // 0004 (hex. length)
 		// No body
@@ -176,8 +203,45 @@ func TestPktLineReadsTextWithErr(t *testing.T) {
 
 	str, err := rw.ReadPacketText()
 
+	assert.Nil(t, err)
+	assert.Equal(t, "", str)
+}
+
+func TestPktLineReadsTextWithLengthWithEmpty(t *testing.T) {
+	rw := NewPktline(bytes.NewReader([]byte{
+		0x30, 0x30, 0x30, 0x34, // 0004 (hex. length)
+		// No body
+	}), nil)
+
+	str, plen, err := rw.ReadPacketTextWithLength()
+
+	assert.Nil(t, err)
+	assert.Equal(t, plen, 4)
+	assert.Equal(t, "", str)
+}
+
+func TestPktLineReadsTextWithErr(t *testing.T) {
+	rw := NewPktline(bytes.NewReader([]byte{
+		0x30, 0x30, 0x30, 0x33, // 0003 (invalid)
+	}), nil)
+
+	str, err := rw.ReadPacketText()
+
 	require.NotNil(t, err)
 	assert.Equal(t, "Invalid packet length.", err.Error())
+	assert.Equal(t, "", str)
+}
+
+func TestPktLineReadsTextWithLengthWithErr(t *testing.T) {
+	rw := NewPktline(bytes.NewReader([]byte{
+		0x30, 0x30, 0x30, 0x33, // 0003 (invalid)
+	}), nil)
+
+	str, plen, err := rw.ReadPacketTextWithLength()
+
+	require.NotNil(t, err)
+	assert.Equal(t, "Invalid packet length.", err.Error())
+	assert.Equal(t, plen, 3)
 	assert.Equal(t, "", str)
 }
 
@@ -203,7 +267,7 @@ func TestPktLineAppendsPacketListsAndReturnsErrs(t *testing.T) {
 		0x30, 0x30, 0x30, 0x38, // 0009 (hex. length)
 		0x61, 0x62, 0x63, 0x64, // "abcd"
 
-		0x30, 0x30, 0x30, 0x34, // 0004 (hex. length)
+		0x30, 0x30, 0x30, 0x33, // 0003 (hex. length)
 		// No body
 	}), nil)
 
