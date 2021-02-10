@@ -44,28 +44,38 @@ func NewPktline(r io.Reader, w io.Writer) *Pktline {
 // If none of the above cases fit the state of the data on the wire, the packet
 // is returned along with a nil error.
 func (p *Pktline) ReadPacket() ([]byte, error) {
+	slice, _, err := p.ReadPacketWithLength()
+	return slice, err
+}
+
+// ReadPacketWithLength is exactly like ReadPacket, but on success, it also
+// returns the packet length header value.  This is useful to distinguish
+// between flush and delim packets, which will return 0 and 1 respectively.  For
+// data packets, the length will be four more than the number of bytes in the
+// slice.
+func (p *Pktline) ReadPacketWithLength() ([]byte, int, error) {
 	var pktLenHex [4]byte
 	if n, err := io.ReadFull(p.r, pktLenHex[:]); err != nil {
-		return nil, err
+		return nil, 0, err
 	} else if n != 4 {
-		return nil, io.ErrShortBuffer
+		return nil, 0, io.ErrShortBuffer
 	}
 
 	pktLen, err := strconv.ParseInt(string(pktLenHex[:]), 16, 0)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
-	// pktLen==0: flush packet
-	if pktLen == 0 {
-		return nil, nil
+	// 0: flush packet, 1: delim packet
+	if pktLen == 0 || pktLen == 1 {
+		return nil, int(pktLen), nil
 	}
-	if pktLen <= 4 {
-		return nil, errors.New("Invalid packet length.")
+	if pktLen < 4 {
+		return nil, int(pktLen), errors.New("Invalid packet length.")
 	}
 
 	payload, err := ioutil.ReadAll(io.LimitReader(p.r, pktLen-4))
-	return payload, err
+	return payload, int(pktLen), err
 }
 
 // ReadPacketText follows identical semantics to the `readPacket()` function,
@@ -76,18 +86,26 @@ func (p *Pktline) ReadPacketText() (string, error) {
 	return strings.TrimSuffix(string(data), "\n"), err
 }
 
+// ReadPacketTextWithLength follows identical semantics to the
+// `ReadPacketWithLength()` function, but additionally removes the trailing `\n`
+// LF from the end of the packet, if present.  The length field is not modified.
+func (p *Pktline) ReadPacketTextWithLength() (string, int, error) {
+	data, pktLen, err := p.ReadPacketWithLength()
+	return strings.TrimSuffix(string(data), "\n"), pktLen, err
+}
+
 // ReadPacketList reads as many packets as possible using the `readPacketText`
 // function before encountering a flush packet. It returns a slice of all the
 // packets it read, or an error if one was encountered.
 func (p *Pktline) ReadPacketList() ([]string, error) {
 	var list []string
 	for {
-		data, err := p.ReadPacketText()
+		data, pktLen, err := p.ReadPacketTextWithLength()
 		if err != nil {
 			return nil, err
 		}
 
-		if len(data) == 0 {
+		if pktLen == 0 {
 			break
 		}
 
@@ -116,6 +134,22 @@ func (p *Pktline) WritePacket(data []byte) error {
 	}
 
 	if _, err := p.w.Write(data); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// WriteDelim writes the separating "delim" packet and then flushes the
+// underlying buffered writer.
+//
+// If any error was encountered along the way, it will be returned immediately
+func (p *Pktline) WriteDelim() error {
+	if _, err := p.w.WriteString(fmt.Sprintf("%04x", 1)); err != nil {
+		return err
+	}
+
+	if err := p.w.Flush(); err != nil {
 		return err
 	}
 
