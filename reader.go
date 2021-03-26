@@ -8,6 +8,8 @@ type PktlineReader struct {
 	pl *Pktline
 
 	buf []byte
+
+	eof bool
 }
 
 // NewPktlineReader returns a new *PktlineReader, which will read from the
@@ -39,6 +41,10 @@ func NewPktlineReaderFromPktline(pl *Pktline, c int) *PktlineReader {
 func (r *PktlineReader) Read(p []byte) (int, error) {
 	var n int
 
+	if r.eof {
+		return 0, io.EOF
+	}
+
 	if len(r.buf) > 0 {
 		// If there is data in the buffer, shift as much out of it and
 		// into the given "p" as we can.
@@ -62,6 +68,7 @@ func (r *PktlineReader) Read(p []byte) (int, error) {
 			// reached the end of processing for this particular
 			// packet, so let's terminate.
 
+			r.eof = true
 			return n, io.EOF
 		}
 
@@ -78,4 +85,10 @@ func (r *PktlineReader) Read(p []byte) (int, error) {
 	}
 
 	return n, nil
+}
+
+// Reset causes the reader to reset the end-of-file indicator and continue
+// reading packets from the underlying reader.
+func (r *PktlineReader) Reset() {
+	r.eof = false
 }

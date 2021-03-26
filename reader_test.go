@@ -141,3 +141,34 @@ func TestPktlineReaderReadsManyPacketsInMultipleCallsWithEvenBuffering(t *testin
 	assert.Equal(t, 0, n3)
 	assert.Equal(t, io.EOF, e3)
 }
+
+func TestPktlineReaderReadEOFAfterEOF(t *testing.T) {
+	var buf bytes.Buffer
+
+	writePacket(t, &buf, []byte("asdf"))
+	writePacket(t, &buf, []byte("abcd"))
+
+	pr := NewPktlineReader(&buf, 10)
+
+	var p1 [5]byte
+
+	n, err := pr.Read(p1[:])
+	assert.Equal(t, err, io.EOF)
+	assert.Equal(t, 4, n)
+	assert.Equal(t, []byte("asdf"), p1[0:n])
+
+	n, err = pr.Read(p1[:])
+	assert.Equal(t, err, io.EOF)
+	assert.Equal(t, 0, n)
+
+	pr.Reset()
+
+	n, err = pr.Read(p1[:])
+	assert.Equal(t, err, io.EOF)
+	assert.Equal(t, 4, n)
+	assert.Equal(t, []byte("abcd"), p1[0:n])
+
+	n, err = pr.Read(p1[:])
+	assert.Equal(t, err, io.EOF)
+	assert.Equal(t, 0, n)
+}
